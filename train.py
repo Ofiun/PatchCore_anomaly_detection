@@ -27,6 +27,8 @@ from sampling_methods.kcenter_greedy import kCenterGreedy
 from sklearn.random_projection import SparseRandomProjection
 from sklearn.neighbors import NearestNeighbors
 from scipy.ndimage import gaussian_filter
+from sklearn.metrics import f1_score, precision_score, recall_score
+from sklearn.metrics import average_precision_score
 
 
 def distance_matrix(x, y=None, p=2):  # pairwise distance of vectors
@@ -240,6 +242,24 @@ def cal_confusion_matrix(y_true, y_pred_no_thresh, thresh, img_path_list):
     print('false negative')
     print(false_n)
     
+def cal_additional_scores(y_true, y_pred_no_thresh, thresh, img_path_list):
+    pred_thresh = []
+    false_n = []
+    false_p = []
+    for i in range(len(y_pred_no_thresh)):
+        if y_pred_no_thresh[i] > thresh:
+            pred_thresh.append(1)
+            if y_true[i] == 0:
+                false_p.append(img_path_list[i])
+        else:
+            pred_thresh.append(0)
+            if y_true[i] == 1:
+                false_n.append(img_path_list[i])
+
+    f1 = f1_score(y_true, pred_thresh)
+    ps = precision_score(y_true, pred_thresh)
+    rs = recall_score(y_true, pred_thresh)
+    return f1, ps, rs
 
 class STPM(pl.LightningModule):
     def __init__(self, hparams):
@@ -397,8 +417,13 @@ class STPM(pl.LightningModule):
         img_auc = roc_auc_score(self.gt_list_img_lvl, self.pred_list_img_lvl)
         print(img_auc)
         print('test_epoch_end')
-        values = {'pixel_auc': pixel_auc, 'img_auc': img_auc}
+        pixel_auprc = average_precision_score(self.gt_list_px_lvl, self.pred_list_px_lvl)
+        img_auprc = average_precision_score(self.gt_list_img_lvl, self.pred_list_img_lvl)
+        #f1, ps, rs = cal_additional_scores(self.gt_list_img_lvl, self.pred_list_img_lvl, img_path_list = self.img_path_list, thresh = 0.00097)
+
+        values = {'pixel_auc': pixel_auc, 'img_auc': img_auc, 'pixel_auprc': pixel_auprc, 'img_auprc': img_auprc,}
         self.log_dict(values)
+
         # anomaly_list = []
         # normal_list = []
         # for i in range(len(self.gt_list_img_lvl)):
